@@ -23,8 +23,8 @@ First of all, we need to define the callbacks to get informations about the uplo
  * @param {Object} fileInfo 
  */
 const success = (fileInfo) => {
-        console.log(fileInfo);
-        res.status(200).json(fileInfo);
+    console.log(fileInfo);
+    res.status(200).json(fileInfo);
 }
 
 /**
