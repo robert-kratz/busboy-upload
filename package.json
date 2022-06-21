@@ -1,0 +1,26 @@
+{
+  "name": "busboy-upload",
+  "version": "1.0.0",
+  "description": "This express middleware is handling fileuploads on top of connect-busboy.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/robert-kratz/busboy-upload.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/robert-kratz/busboy-upload/issues"
+  },
+  "homepage": "https://github.com/robert-kratz/busboy-upload#readme",
+  "dependencies": {
+    "connect-busboy": "^1.0.0",
+    "fs": "0.0.1-security",
+    "path": "^0.12.7",
+    "stream-meter": "^1.0.4"
+  }
+}
