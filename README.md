@@ -34,7 +34,7 @@ const success = (file) => {
 const config = {
     uploadPath: __dirname + '/uploads/',
     uploadName: Date.now(),
-    maxSize: -1, // Set the filesize to -1 and all file sizes will be accepted
+    maxSize: 100000,
     mimeTypes: ['image/jpeg'], // Take a look into all aviable mime types here: https://developer.mozilla.org/en-US/docs/Web/HTTP/Basics_of_HTTP/MIME_types/Common_types
     maxsize: 100000, // In bytes
     filter: (file, deny) => {
@@ -42,6 +42,8 @@ const config = {
     }
 }
 ```
+
+Note: If you do not want to apply a filter, just leave the config parameter blanc.
 
 The parameter `file` in filter will have the format like <a href="#file-has-been-successfully-uploaded">this</a>.
 
