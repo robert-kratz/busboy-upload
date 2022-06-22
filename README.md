@@ -2,16 +2,17 @@
 This express middleware is handling fileuploads on top of connect-busboy. It provides an simple solution to deal with large files.
 
 ```
-npm install busboy-upload
+$ npm install busboy-upload
 ```
 
 ## Content
 
  - <a href="#usage">Usage</a>
+ - <a href="#api-response">API Response</a>
  - <a href="#set-up-the-middleware">Set up the express middleware</a>
  - <a href="#file-object">Informations about the uploaded file</a>
  - <a href="#errors">Error Handling</a>
- - <a href="#debugging">Debugging</a>
+ - <a href="#test-your-code-with-axios">Test your code</a>
 
 ## Usage
 
@@ -22,26 +23,28 @@ First of all, we need to define the callbacks to get informations about the uplo
  * Is fired when file has been successfully uploaded
  * @param {Object} fileInfo 
  */
-const success = (fileInfo) => {
-    console.log(fileInfo);
-    res.status(200).json(fileInfo);
-}
+const success = (file) => {
 
-/**
- * Is fired when an error occored
- * @param {Error} error 
- */
-const error = (error) => {
-    if(error === 'UPLOADED_FILE_TO_BIG') return res.send('The uploaded file is too big');
-    if(error === 'UNABLE_TO_UPLOAD_FILE') return res.send('An error occoured');
+    console.log(file.stats); // { total: 20, error: 10, success: 10 }
+    console.log(file.files); // Array of all files
+    console.log(file.duration); //file upload duration in ms
     
-    // Handle error
 }
 
 const config = {
     uploadPath: __dirname + '/uploads/',
     uploadName: Date.now(),
     maxSize: -1 // Set the filesize to -1 and all file sizes will be accepted
+}
+```
+
+## API Response
+
+```js
+{
+  stats: { total: 20, error: 10, success: 10 },
+  files: [],
+  duration: 1041 //in ms
 }
 ```
 
@@ -59,7 +62,7 @@ app.use('/upload', (req, res) => {
 
   // Callbacks from above
   
-  fileUpload(req, res, success, error, config);
+  fileUpload(req, success, config);
 });
 ```
 
@@ -69,36 +72,51 @@ app.use('/upload', (req, res) => {
 
 ```js
 {
+  errors: [],
   originalFile: {
-    name: 'file.zip',
-    field: 'file',
+    filename: 'test.jpeg',
     encoding: '7bit',
-    mime: 'application/zip',
-    size: 102170072
+    mimeType: 'image/jpeg',
+    uploadedPath: 'uploads/file9-test.jpeg-1655893178067.jpeg'
   },
   uploadedFile: {
-    uploadedName: 1655839067549,
-    uploadedPath: 'uploads/1655839067549.zip',
-    uploadDuration: 349,
+    uploadedName: 'file9-test.jpeg-1655893178067',
+    uploadedPath: 'uploads/file9-test.jpeg-1655893178067.jpeg',
+    uploadDuration: 1,
+    success: true,
     fileInfo: {
-      dev: 16777231,
-      mode: 33188,
-      nlink: 1,
-      uid: 501,
-      gid: 20,
-      rdev: 0,
-      blksize: 4096,
-      ino: 74866131,
-      size: 102170072,
-      blocks: 760,
-      atimeMs: 1655839067552.3833,
-      mtimeMs: 1655839067897.821,
-      ctimeMs: 1655839067897.821,
-      birthtimeMs: 1655839067552.3833,
-      atime: '2022-06-21T19:17:47.552Z',
-      mtime: '2022-06-21T19:17:47.898Z',
-      ctime: '2022-06-21T19:17:47.898Z',
-      birthtime: '2022-06-21T19:17:47.552Z'
+      _readableState: [Object],
+      _events: {},
+      _eventsCount: 0,
+      truncated: false,
+      _readcb: null
+    },
+    size: 89090
+  }
+}
+```
+
+### File has been not been successfully uploaded:
+
+```js
+{
+  errors: [ 'FILE_TYPE_NOT_ALLOWED' ],
+  originalFile: {
+    filename: 'bomb.zip',
+    encoding: '7bit',
+    mimeType: 'application/zip'
+  },
+  uploadedFile: {
+    uploadedName: 'bomb9-bomb.zip-1655893178067',
+    uploadedPath: 'uploads/bomb9-bomb.zip-1655893178067.zip',
+    uploadDuration: 0,
+    success: false,
+    fileInfo: {
+      _readableState: [Object],
+      _events: {},
+      _eventsCount: 0,
+      truncated: false,
+      _readcb: null
     }
   }
 }
@@ -108,33 +126,50 @@ Note: The file size is provided in Bytes
 
 
 ## Errors
-The parameter `error` returns one of these following errors. In the table below, you can learn how to deal with errors
+The parameter `error` of a file returns one of these following errors. In the table below, you can learn how to deal with errors
 
 Error | Meaning
 --- | ---
-NO_UPLOAD_PATH_PROVIDED | Add the parameter uploadPath to the config
-NO_UPLOAD_NAME_PROVIDED | Add the parameter uploadName to the config
-BUSBOY_NOT_IN_MIDDLEWARE_FOUND | Add `app.use(busboy({ immediate: true }));` to the express router
-UPLOADED_FILE_TO_BIG | The uploaded file is bigger than in the config provided
-UNABLE_TO_UPLOAD_FILE | The server could not found the uploaded file, check if the application has permission to access the uploading directory
+FILE_TYPE_NOT_ALLOWED | The filetype does not match the provided query
+UPLOADED_FILE_TO_BIG | The provided file exeedes the provided limit of bytes 
 
 Note: Other errors could occoure, in this case you probably did something wrong whith the config, open a <a href="https://github.com/robert-kratz/busboy-upload/issues">new issues</a>
 
-## Debugging
+## Test your code with axios
 
-In case that you want to get the current state of the upload, you can use the debug callback as part of the config object.
+To test your code, you can start uploading file with <a href="https://github.com/axios/axios">axios</a>. For that, you need to have <a href="https://www.npmjs.com/package/form-data">form-data</a>, <a href="https://nodejs.org/api/fs.html">fs</a> and <a href="https://www.npmjs.com/package/axios">axios</a> installed, you can do that by running:
+
+```
+$ npm install fs form-data axios
+```
+
+### Sample code:
 
 ```js
-const debug = (debug) => {
-    console.log(debug);
+
+const formData = require('form-data');
+const fs = require('fs');
+
+const axios = require('axios').default;
+
+const init = async () => {
+    const fd = new formData();
+
+    fd.append('cat', fs.createReadStream('./miau.jpeg'));
+    fd.append('dog', fs.createReadStream('./dog.jpeg'));
+
+    const res = await axios.post('http://127.0.0.1:443/upload', fd, {
+        maxBodyLength: Infinity,
+        maxContentLength: Infinity,
+            headers: {
+                ...fd.getHeaders()
+            }
+    }).then(res => {
+        console.log(res.data);
+    }).catch(err => console.log(err));
 }
 
-const config = {
-    uploadPath: 'uploads/',
-    uploadName: Date.now(),
-    maxSize: -1
-    debug: debug
-}
+init();
 ```
 
  Made by <a href="https://github.com/robert-kratz">Robert J. Kratz</a>
