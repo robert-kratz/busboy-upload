@@ -34,9 +34,16 @@ const success = (file) => {
 const config = {
     uploadPath: __dirname + '/uploads/',
     uploadName: Date.now(),
-    maxSize: -1 // Set the filesize to -1 and all file sizes will be accepted
+    maxSize: -1, // Set the filesize to -1 and all file sizes will be accepted
+    mimeTypes: ['image/jpeg'], // Take a look into all aviable mime types here: https://developer.mozilla.org/en-US/docs/Web/HTTP/Basics_of_HTTP/MIME_types/Common_types
+    maxsize: 100000, // In bytes
+    filter: (file, deny) => {
+        if(file.originalFile.filename == 'test.jpesg') return deny('INVALID_BIT_AMOUNT'); // Method needs to be returned!
+    }
 }
 ```
+
+The parameter `file` in filter will have the format like <a href="#file-has-been-successfully-uploaded">this</a>.
 
 ## API Response
 
@@ -132,6 +139,8 @@ Error | Meaning
 --- | ---
 FILE_TYPE_NOT_ALLOWED | The filetype does not match the provided query
 UPLOADED_FILE_TO_BIG | The provided file exeedes the provided limit of bytes 
+MAXMUM_FILE_AMOUNT_REACHED | The maximum file size has been reached, no files after the limit will be uploaded
+FILE_TYPE_NOT_ALLOWED | The mime type is not allowed to be uploaded
 
 Note: Other errors could occoure, in this case you probably did something wrong whith the config, open a <a href="https://github.com/robert-kratz/busboy-upload/issues">new issues</a>
 
