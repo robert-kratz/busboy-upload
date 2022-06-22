@@ -24,6 +24,9 @@ app.use('/upload', (req, res) => {
         },
         mimeTypes: ['image/jpeg'],
         maxsize: 100000,
+        filter: (file, deny) => {
+            if(file.originalFile.filename == 'test.jpesg') return deny('INVALID_BIT_AMOUNT')
+        }
     }
 
     fileUpload(req, success, config);
