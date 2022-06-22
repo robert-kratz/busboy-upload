@@ -19,12 +19,16 @@ const middlewareFileUpload = async (req, success, options) => {
 
     let fileCollection = [], uploadStartTimestamp = Date.now(), fileAmountError = 0, fileAmountSuccess = 0;
 
+    let fileCounter = 0, fileWriteQueue = 0, finishedRequest = false;
+
     const onFileUploadStart = async (fieldName, file, info) => {
 
         const { filename, encoding, mimeType } = info, singeUploadStartTimestamp = Date.now();
 
         const uploadName = await options.uploadName(fieldName, filename, encoding, mimeType) || Date.now();
         const saveTo = path.join(`uploads/${uploadName}.${getFileEnding(info.filename)}`); 
+
+        fileCounter++;
 
         var chunks = [], errors = [], isValid = true;
 
@@ -40,6 +44,17 @@ const middlewareFileUpload = async (req, success, options) => {
             }
         }
 
+        if(options.filter != undefined) {
+            options.filter(fileFormat, (err) => {
+                errors.push(err || 'FILTER_DID_NOT_ACCEPT_INPUT');
+                isValid = false;
+            })
+        }
+        if(options.maxAmount != undefined && fileCounter > options.maxAmount) {
+            errors.push('MAXMUM_FILE_AMOUNT_REACHED');
+            isValid = false
+        }
+
         if(options.mimeTypes != undefined && !options.mimeTypes.includes(mimeType)) {
             errors.push('FILE_TYPE_NOT_ALLOWED');
             isValid = false;
@@ -49,7 +64,13 @@ const middlewareFileUpload = async (req, success, options) => {
 
         let size = 0;
         readStream.on('data', (chunk) => {
-            if(!isValid) return;
+            if(!isValid) {
+                file.resume();
+                readStream.unpipe();
+
+                delete chunks;
+                return;
+            }
 
             size = size + chunk.length;
 
@@ -57,22 +78,19 @@ const middlewareFileUpload = async (req, success, options) => {
 
             if(options.maxsize != undefined && size > options.maxsize) {
                 isValid = false;
-
-                file.resume();
-                readStream.unpipe();
-
-                delete chunks;
-
                 errors.push('UPLOADED_FILE_TO_BIG');
                 return;
             }
         });
 
         readStream.on('end', () => {
+            fileWriteQueue++;
+
             if(isValid) {
                 fileAmountSuccess++;
                 saveToFile();
             } else {
+                fileWriteQueue--;
                 fileAmountError++;
                 fileCollection.push(fileFormat);
             }
@@ -86,19 +104,38 @@ const middlewareFileUpload = async (req, success, options) => {
             fileFormat.uploadedFile.size = size;
             fileFormat.originalFile.uploadedName = options.uploadName;
             fileFormat.originalFile.uploadedPath = saveTo;
-        
+
             readable.pipe(writeStream);
 
             readable.on('end', () => {
+                fileWriteQueue--;
+
                 fileFormat.uploadedFile.uploadDuration = (Date.now() - singeUploadStartTimestamp);
                 fileFormat.uploadedFile.success = true;
 
                 fileCollection.push(fileFormat);
+
+                if(fileWriteQueue == 0 && !finishedRequest) {
+                    finishedRequest = true;
+                    return success({
+                        stats: {
+                            total: fileAmountError + fileAmountSuccess,
+                            error: fileAmountError,
+                            success: fileAmountSuccess
+                        },
+                        files: fileCollection,
+                        duration: (Date.now() - uploadStartTimestamp)
+                    })
+                }
             })
         }
     };
 
     const onFileUploadFinish = async () => {
+        if(finishedRequest || fileWriteQueue != 0) return;
+
+        finishedRequest = true;
+
         return success({
             stats: {
                 total: fileAmountError + fileAmountSuccess,
