@@ -65,7 +65,7 @@ module.exports = async (req, success, options) => {
                 errorOccoured = true;
             })
         }
-        if(options.maxAmount != undefined && fileCounter > options.maxAmount) {
+        if(options.maxAmount != undefined && (totalFilesRead + totalFilesError) > options.maxAmount) {
             errors.push('MAXIMUM_FILE_AMOUNT_REACHED');
             errorOccoured = true;
         }
