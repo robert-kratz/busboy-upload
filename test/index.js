@@ -5,9 +5,9 @@ const app = express();
 
 app.use(busboy({ immediate: true }));
 
-const fileUpload = require('..');
+const fileUpload = require('../index');
 
-app.use('/upload', (req, res) => {
+app.post('/upload', (req, res) => {
 
     /**
      * Is fired when file has been successfully uploaded
@@ -22,10 +22,9 @@ app.use('/upload', (req, res) => {
         uploadName: (fieldName, filename, encoding, mimeType) => {
             return fieldName + '-' + filename + '-' + Date.now();
         },
-        mimeTypes: ['image/jpeg'],
         maxsize: 100000,
         filter: (file, deny) => {
-            if(file.originalFile.filename == 'test.jpesg') return deny('INVALID_BIT_AMOUNT')
+            if(file.originalFile.filename == 'test.jpeg') return deny('INVALID_BIT_AMOUNT')
         }
     }
 

@@ -10,6 +10,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "busboy-upload": "^2.0.1",
     "connect-busboy": "^1.0.0",
     "express": "^4.18.1",
     "nodemon": "^2.0.16"
