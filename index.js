@@ -1,6 +1,6 @@
 const meter = require('stream-meter');
 
-const { Readable } = require("stream")
+const { Readable } = require('stream');
 
 const fs = require('fs');
 const path = require('path');
@@ -12,59 +12,72 @@ const path = require('path');
  * @param {Callback} success 
  * @param {Object} options 
  */
-const middlewareFileUpload = async (req, success, options) => {
-
-    if(!req.busboy) throw new Error('Busboy not found on request');
+module.exports = async (req, success, options) => {
     if(!options.uploadPath) throw new Error('No upload path provided');
 
-    let fileCollection = [], uploadStartTimestamp = Date.now(), fileAmountError = 0, fileAmountSuccess = 0;
+    
+    var totalFilesRead = 0, totalFilesWritten = 0, totalFilesError = 0;
+    var fileCollection = [], requestStartTimestamp = Date.now(), totalFileSize = 0;
 
-    let fileCounter = 0, fileWriteQueue = 0, finishedRequest = false;
+    if(!req.busboy) {
+        return success({
+            stats: {
+                total: (totalFilesRead + totalFilesError),
+                error: totalFilesError,
+                success: totalFilesRead
+            },
+            files: fileCollection,
+            duration: (Date.now() - requestStartTimestamp),
+            totalFileSize: totalFileSize
+        });
+    }
 
+    /**
+     * STARING TO WRITE INCOMING STREAM FROM CLIENT
+     */
     const onFileUploadStart = async (fieldName, file, info) => {
 
-        const { filename, encoding, mimeType } = info, singeUploadStartTimestamp = Date.now();
+        const { filename, encoding, mimeType } = info;
 
         const uploadName = await options.uploadName(fieldName, filename, encoding, mimeType) || Date.now();
-        const saveTo = path.join(`uploads/${uploadName}.${getFileEnding(info.filename)}`); 
+        const saveTo = path.join(`${options.uploadPath}/${uploadName}.${getFileEnding(info.filename)}`); 
 
-        fileCounter++;
+        var chunks = [], errorOccoured = false, errorCollection = [];
 
-        var chunks = [], errors = [], isValid = true;
+        const readStream = file.pipe(meter());
 
-        let fileFormat = {
-            errors: errors,
+        let readFile = {
+            errors: errorCollection,
             originalFile: info,
             uploadedFile: {
                 uploadedName: uploadName,
                 uploadedPath: saveTo,
-                uploadDuration: 0,
+                uploadDuration: Date.now(),
                 success: false,
+                fileSize: 0,
                 fileInfo: file
             }
         }
 
         if(options.filter != undefined) {
-            options.filter(fileFormat, (err) => {
+            options.filter(readFile, (err) => {
                 errors.push(err || 'FILTER_DID_NOT_ACCEPT_INPUT');
-                isValid = false;
+                errorOccoured = true;
             })
         }
         if(options.maxAmount != undefined && fileCounter > options.maxAmount) {
-            errors.push('MAXMUM_FILE_AMOUNT_REACHED');
-            isValid = false
+            errors.push('MAXIMUM_FILE_AMOUNT_REACHED');
+            errorOccoured = true;
         }
 
         if(options.mimeTypes != undefined && !options.mimeTypes.includes(mimeType)) {
             errors.push('FILE_TYPE_NOT_ALLOWED');
-            isValid = false;
+            errorOccoured = true;
         }
 
-        const readStream = file.pipe(meter());
-
-        let size = 0;
+        let fileSize = 0;
         readStream.on('data', (chunk) => {
-            if(!isValid) {
+            if(errorOccoured) {
                 file.resume();
                 readStream.unpipe();
 
@@ -72,79 +85,70 @@ const middlewareFileUpload = async (req, success, options) => {
                 return;
             }
 
-            size = size + chunk.length;
+            fileSize = fileSize + chunk.length;
 
             chunks.push(chunk)
-
-            if(options.maxsize != undefined && size > options.maxsize) {
-                isValid = false;
-                errors.push('UPLOADED_FILE_TO_BIG');
+            if(options.maxsize != undefined && fileSize > options.maxsize) {
+                errorOccoured = true;
+                errorCollection.push('UPLOADED_FILE_TO_BIG');
                 return;
             }
         });
 
         readStream.on('end', () => {
-            fileWriteQueue++;
-
-            if(isValid) {
-                fileAmountSuccess++;
-                saveToFile();
+            if(errorOccoured) {
+                totalFilesError++;
             } else {
-                fileWriteQueue--;
-                fileAmountError++;
-                fileCollection.push(fileFormat);
+                totalFilesRead++;
+                totalFileSize = totalFileSize + fileSize;
             }
         })
 
-        const saveToFile = async () => {
-            
-            const readable = Readable.from(chunks)
-            const writeStream = fs.createWriteStream(saveTo);
+        readStream.on('close', () => {
+            if(chunks !== undefined) readFile.chunks = chunks;
 
-            fileFormat.uploadedFile.size = size;
-            fileFormat.originalFile.uploadedName = options.uploadName;
-            fileFormat.originalFile.uploadedPath = saveTo;
+            readFile.uploadedFile.fileSize = fileSize;
 
-            readable.pipe(writeStream);
-
-            readable.on('end', () => {
-                fileWriteQueue--;
-
-                fileFormat.uploadedFile.uploadDuration = (Date.now() - singeUploadStartTimestamp);
-                fileFormat.uploadedFile.success = true;
-
-                fileCollection.push(fileFormat);
-
-                if(fileWriteQueue == 0 && !finishedRequest) {
-                    finishedRequest = true;
-                    return success({
-                        stats: {
-                            total: fileAmountError + fileAmountSuccess,
-                            error: fileAmountError,
-                            success: fileAmountSuccess
-                        },
-                        files: fileCollection,
-                        duration: (Date.now() - uploadStartTimestamp)
-                    })
-                }
-            })
-        }
+            fileCollection.push(readFile)
+        })
     };
 
+    /**
+     * FINISHED WITH READING, CONTINUE WITH WRITING TO DISK
+     */
     const onFileUploadFinish = async () => {
-        if(finishedRequest || fileWriteQueue != 0) return;
+        for(const file of fileCollection) {
+            if(file.errors.length > 0) {
+                totalFilesWritten++;
+            } else {
+                const readable = Readable.from(file.chunks)
+                const writeStream = fs.createWriteStream(file.uploadedFile.uploadedPath);
 
-        finishedRequest = true;
+                readable.pipe(writeStream);
 
-        return success({
-            stats: {
-                total: fileAmountError + fileAmountSuccess,
-                error: fileAmountError,
-                success: fileAmountSuccess
-            },
-            files: fileCollection,
-            duration: (Date.now() - uploadStartTimestamp)
-        })
+                readable.on('close', () => {
+                    totalFilesWritten++;
+
+                    file.uploadedFile.uploadDuration = Date.now() - file.uploadedFile.uploadDuration;
+
+                    file.chunks = undefined;
+                    delete file.uploadedFile.fileInfo;
+
+                    if((totalFilesRead + totalFilesError) == totalFilesWritten) {
+                        return success({
+                            stats: {
+                                total: (totalFilesRead + totalFilesError),
+                                error: totalFilesError,
+                                success: totalFilesRead
+                            },
+                            files: fileCollection,
+                            duration: (Date.now() - requestStartTimestamp),
+                            totalFileSize: totalFileSize
+                        });
+                    }
+                });
+            }
+        }
     };
 
     req.busboy.on('file', onFileUploadStart)
@@ -156,7 +160,7 @@ const middlewareFileUpload = async (req, success, options) => {
  * @param {String} fullName 
  * @returns String
  */
-const getFileEnding = (fullName) => {
+ const getFileEnding = (fullName) => {
     const array = fullName.split('.');
 
     if(array.length == 1) return '.txt'
@@ -167,5 +171,3 @@ const getFileEnding = (fullName) => {
     }
     return ending.slice(1, ending.length);
 }
-
-module.exports = middlewareFileUpload;
