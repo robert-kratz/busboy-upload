@@ -1,6 +1,6 @@
 {
   "name": "busboy-upload",
-  "version": "2.0.1",
+  "version": "2.1.0",
   "description": "This express middleware is handling fileuploads on top of connect-busboy.",
   "main": "index.js",
   "scripts": {

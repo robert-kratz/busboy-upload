@@ -141,7 +141,7 @@ Error | Meaning
 --- | ---
 FILE_TYPE_NOT_ALLOWED | The filetype does not match the provided query
 UPLOADED_FILE_TO_BIG | The provided file exeedes the provided limit of bytes 
-MAXMUM_FILE_AMOUNT_REACHED | The maximum file size has been reached, no files after the limit will be uploaded
+MAXIMUM_FILE_AMOUNT_REACHED | The maximum file size has been reached, no files after the limit will be uploaded
 FILE_TYPE_NOT_ALLOWED | The mime type is not allowed to be uploaded
 
 Note: Other errors could occoure, in this case you probably did something wrong whith the config, open a <a href="https://github.com/robert-kratz/busboy-upload/issues">new issues</a>
