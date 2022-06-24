@@ -39,7 +39,8 @@ const config = {
     maxsize: 100000, // In bytes
     filter: (file, deny) => {
         if(file.originalFile.filename == 'test.jpesg') return deny('INVALID_BIT_AMOUNT'); // Method needs to be returned!
-    }
+    },
+    onlyRead: true // Only reads the incoming form-data, appends an parameter chunks to file as a Buffer of the file content
 }
 ```
 
