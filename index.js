@@ -53,11 +53,12 @@ module.exports = async (req, success, options) => {
                 uploadedName: uploadName,
                 uploadedPath: saveTo,
                 uploadDuration: Date.now(),
-                success: false,
                 fileSize: 0,
                 fileInfo: file
             }
         }
+
+        readFile.originalFile.fieldName = fieldName;
 
         if(options.filter != undefined) {
             options.filter(readFile, (err) => {
@@ -117,6 +118,19 @@ module.exports = async (req, success, options) => {
      * FINISHED WITH READING, CONTINUE WITH WRITING TO DISK
      */
     const onFileUploadFinish = async () => {
+        if(options.onlyRead !== undefined && options.onlyRead) {
+            return success({
+                stats: {
+                    total: (totalFilesRead + totalFilesError),
+                    error: totalFilesError,
+                    success: totalFilesRead
+                },
+                files: fileCollection,
+                duration: (Date.now() - requestStartTimestamp),
+                totalFileSize: totalFileSize
+            });
+        }
+
         for(const file of fileCollection) {
             if(file.errors.length > 0) {
                 totalFilesWritten++;

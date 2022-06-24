@@ -25,7 +25,8 @@ app.post('/upload', (req, res) => {
         maxsize: 100000,
         filter: (file, deny) => {
             if(file.originalFile.filename == 'test.jpeg') return deny('INVALID_BIT_AMOUNT')
-        }
+        },
+        onlyRead: true
     }
 
     fileUpload(req, success, config);
